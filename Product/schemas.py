@@ -14,3 +14,15 @@ class DisplayProduct(BaseModel):
     class Config:
         from_attributes = True
         
+class Seller(BaseModel):
+    username: str
+    email: str
+    password: str
+
+class DisplaySeller(BaseModel):
+    username: str
+    email: str
+
+    class Config:
+        from_attributes = True
+

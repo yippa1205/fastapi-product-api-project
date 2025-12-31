@@ -1,19 +1,22 @@
 # FastAPI Product Management API
 
-A lightweight RESTful API for managing product inventory, built with FastAPI and SQLAlchemy. This project provides a simple yet robust backend solution for product CRUD (Create, Read, Update, Delete) operations with SQLite database persistence.
+A lightweight RESTful API for managing product inventory and seller accounts, built with FastAPI and SQLAlchemy. This project provides a simple yet robust backend solution for product CRUD (Create, Read, Update, Delete) operations and seller registration with SQLite database persistence.
 
 ## Overview
 
-This API enables developers to build product management systems with essential features for creating, retrieving, updating, and deleting product records. It's ideal for e-commerce applications, inventory management systems, or as a learning resource for FastAPI development.
+This API enables developers to build product management systems with essential features for creating, retrieving, updating, and deleting product records, as well as secure seller account registration. It's ideal for e-commerce applications, inventory management systems, or as a learning resource for FastAPI development.
 
 ### Key Features
 
 - **Full CRUD Operations**: Complete product lifecycle management
+- **Seller Registration**: Secure user account creation with password hashing
+- **Password Security**: Bcrypt-based password hashing using passlib
 - **RESTful API Design**: Clean, intuitive endpoint structure
 - **SQLite Database**: Lightweight, file-based data persistence
 - **SQLAlchemy ORM**: Type-safe database interactions
 - **Pydantic Validation**: Automatic request/response validation
 - **Response Model Filtering**: Control which fields are exposed in API responses
+- **HTTP Status Codes**: Proper status code handling (201 Created for POST endpoints)
 - **Interactive Documentation**: Auto-generated Swagger UI and ReDoc
 - **Dependency Injection**: Efficient database session management
 
@@ -35,10 +38,11 @@ fastapi_project/
 
 ### Components
 
-- **Models** ([Product/models.py](Product/models.py)): Defines the database schema using SQLAlchemy ORM
-- **Schemas** ([Product/schemas.py](Product/schemas.py)): Pydantic models for request/response validation
+- **Models** ([Product/models.py](Product/models.py)): Defines the database schema using SQLAlchemy ORM (Product and Seller tables)
+- **Schemas** ([Product/schemas.py](Product/schemas.py)): Pydantic models for request/response validation (includes DisplaySeller for response filtering)
 - **Database** ([Product/database.py](Product/database.py)): Database engine configuration and session factory
-- **API Routes** ([Product/main.py](Product/main.py)): FastAPI endpoints for product operations
+- **API Routes** ([Product/main.py](Product/main.py)): FastAPI endpoints for product operations and seller registration
+- **Security** ([Product/main.py](Product/main.py:16)): Password hashing context using passlib with bcrypt
 
 ## Getting Started
 
@@ -87,19 +91,29 @@ The API will be available at:
 
 ### Endpoints
 
-| Method | Endpoint | Description | Request Body |
-|--------|----------|-------------|--------------|
-| `GET` | `/products` | Retrieve all products | None |
-| `GET` | `/product/{id}` | Retrieve a single product by ID | None |
-| `POST` | `/product` | Create a new product | Product object |
-| `PUT` | `/product/{id}` | Update an existing product by ID | Product object |
-| `DELETE` | `/product/{id}` | Delete a product by ID | None |
+#### Product Endpoints
+
+| Method | Endpoint | Description | Request Body | Status Code |
+|--------|----------|-------------|--------------|-------------|
+| `GET` | `/products` | Retrieve all products | None | 200 OK |
+| `GET` | `/product/{id}` | Retrieve a single product by ID | None | 200 OK |
+| `POST` | `/product` | Create a new product | Product object | 201 Created |
+| `PUT` | `/product/{id}` | Update an existing product by ID | Product object | 200 OK |
+| `DELETE` | `/product/{id}` | Delete a product by ID | None | 200 OK |
+
+#### Seller Endpoints
+
+| Method | Endpoint | Description | Request Body | Status Code |
+|--------|----------|-------------|--------------|-------------|
+| `POST` | `/seller` | Create a new seller account | Seller object | 200 OK |
 
 ### Data Models
 
-The API uses two Pydantic schemas for request/response validation:
+The API uses Pydantic schemas for request/response validation:
 
-#### Product Schema (Input)
+#### Product Schemas
+
+##### Product Schema (Input)
 
 Used for creating and updating products.
 
@@ -117,7 +131,7 @@ Used for creating and updating products.
 | `description` | string | Yes | Product description |
 | `price` | integer | Yes | Product price (in cents or smallest currency unit) |
 
-#### DisplayProduct Schema (Output)
+##### DisplayProduct Schema (Output)
 
 Used for GET endpoints to control response data. This schema **excludes the price field** for privacy/security.
 
@@ -135,9 +149,49 @@ Used for GET endpoints to control response data. This schema **excludes the pric
 
 **Note:** The `price` field is intentionally hidden in GET responses using the `DisplayProduct` response model.
 
+#### Seller Schemas
+
+##### Seller Schema (Input)
+
+Used for creating seller accounts.
+
+```json
+{
+  "username": "string",
+  "email": "string",
+  "password": "string"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `username` | string | Yes | Seller's username |
+| `email` | string | Yes | Seller's email address |
+| `password` | string | Yes | Seller's password (will be hashed with bcrypt) |
+
+##### DisplaySeller Schema (Output)
+
+Used for seller registration responses. This schema **excludes the password field** for security.
+
+```json
+{
+  "username": "string",
+  "email": "string"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `username` | string | Seller's username |
+| `email` | string | Seller's email address |
+
+**Note:** The `password` field is never returned in responses. Passwords are hashed using bcrypt before storage.
+
 ### Usage Examples
 
-#### Create a Product
+#### Product Operations
+
+##### Create a Product
 
 **Request:**
 ```bash
@@ -150,16 +204,17 @@ curl -X POST "http://localhost:8000/product" \
   }'
 ```
 
-**Response:**
+**Response:** (Status: 201 Created)
 ```json
 {
+  "id": 1,
   "name": "Laptop",
   "description": "High-performance laptop with 16GB RAM",
   "price": 129999
 }
 ```
 
-#### Get All Products
+##### Get All Products
 
 **Request:**
 ```bash
@@ -182,7 +237,7 @@ curl -X GET "http://localhost:8000/products"
 
 **Note:** This endpoint uses the `DisplayProduct` response model, which filters out the `price` field for privacy/security purposes.
 
-#### Get Single Product
+##### Get Single Product
 
 **Request:**
 ```bash
@@ -199,7 +254,7 @@ curl -X GET "http://localhost:8000/product/1"
 
 **Note:** This endpoint uses the `DisplayProduct` response model, which filters out the `price` field for privacy/security purposes.
 
-#### Update a Product
+##### Update a Product
 
 **Request:**
 ```bash
@@ -219,7 +274,7 @@ curl -X PUT "http://localhost:8000/product/1" \
 }
 ```
 
-#### Delete a Product
+##### Delete a Product
 
 **Request:**
 ```bash
@@ -234,12 +289,49 @@ curl -X DELETE "http://localhost:8000/product/1"
 }
 ```
 
+#### Seller Operations
+
+##### Create a Seller Account
+
+**Request:**
+```bash
+curl -X POST "http://localhost:8000/seller" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "john_seller",
+    "email": "john@example.com",
+    "password": "SecurePassword123"
+  }'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "username": "john_seller",
+  "email": "john@example.com",
+  "password": "$2b$12$hashed_password_string_here"
+}
+```
+
+**Note:** The password is automatically hashed using bcrypt before storage. In production, you may want to use the `DisplaySeller` response model to hide the hashed password from the response.
+
 ### Python Client Example
 
 ```python
 import requests
 
 BASE_URL = "http://localhost:8000"
+
+# Create a seller account
+new_seller = {
+    "username": "alice_seller",
+    "email": "alice@example.com",
+    "password": "MySecurePassword456"
+}
+response = requests.post(f"{BASE_URL}/seller", json=new_seller)
+print(response.json())
+# Output: {"id": 1, "username": "alice_seller", "email": "alice@example.com", "password": "$2b$12$..."}
 
 # Create a product
 new_product = {
@@ -249,6 +341,7 @@ new_product = {
 }
 response = requests.post(f"{BASE_URL}/product", json=new_product)
 print(response.json())
+print(f"Status Code: {response.status_code}")  # 201 Created
 
 # Get all products (returns DisplayProduct - no price field)
 response = requests.get(f"{BASE_URL}/products")
@@ -285,37 +378,61 @@ print(response.json())
 - Connection string: `sqlite:///./product.db`
 - Configured with `check_same_thread=False` for FastAPI compatibility
 
-**Models** ([Product/models.py](Product/models.py:4-9))
-- `Product` table with auto-incrementing ID
-- Indexed primary key for efficient queries
+**Models** ([Product/models.py](Product/models.py))
+- `Product` table with auto-incrementing ID, name, description, and price fields
+- `Seller` table with auto-incrementing ID, username, email, and password fields
+- Indexed primary keys for efficient queries
 
 **Schemas** ([Product/schemas.py](Product/schemas.py))
 - `Product`: Full schema for input validation (create/update operations)
 - `DisplayProduct`: Filtered schema for GET responses (excludes price field)
+- `Seller`: Full schema for seller registration input
+- `DisplaySeller`: Filtered schema for seller responses (excludes password field)
 - Uses Pydantic v2 with `from_attributes = True` for SQLAlchemy compatibility
 
-**Dependency Injection** ([Product/main.py](Product/main.py:15-19))
+**Security** ([Product/main.py](Product/main.py:16))
+- `pwd_context`: Password hashing context using passlib with bcrypt
+- Passwords are automatically hashed before database storage
+- Uses bcrypt version 4.1.2 for secure password hashing
+
+**Dependency Injection** ([Product/main.py](Product/main.py:18-23))
 - `get_db()` function provides database sessions
 - Automatic session cleanup with try/finally pattern
 
-**Response Models** ([Product/main.py](Product/main.py:42-47))
+**Response Models** ([Product/main.py](Product/main.py:46-56))
 - GET endpoints use `response_model=DisplayProduct` to filter sensitive data
 - Uses `List[DisplayProduct]` for list endpoints
 - Provides data privacy by hiding price information in public endpoints
+
+**HTTP Status Codes** ([Product/main.py](Product/main.py:58))
+- POST `/product` endpoint returns 201 Created status code
+- Proper REST API status code implementation
 
 ### Adding New Features
 
 To extend the API with additional functionality:
 
-1. **Add a new field to the Product model:**
-   - Update [Product/models.py](Product/models.py)
-   - Update [Product/schemas.py](Product/schemas.py)
+1. **Add a new field to an existing model:**
+   - Update the model in [Product/models.py](Product/models.py)
+   - Update the corresponding schema in [Product/schemas.py](Product/schemas.py)
    - Delete `product.db` to recreate the database with new schema
 
-2. **Add a new endpoint:**
+2. **Add a new database table:**
+   - Create a new model class in [Product/models.py](Product/models.py)
+   - Create corresponding Pydantic schemas in [Product/schemas.py](Product/schemas.py)
+   - Consider creating a Display schema to filter sensitive fields
+   - Add endpoints in [Product/main.py](Product/main.py)
+
+3. **Add a new endpoint:**
    - Define the route in [Product/main.py](Product/main.py)
    - Use dependency injection for database access
    - Follow existing patterns for consistency
+   - Use appropriate HTTP status codes
+
+4. **Implement password hashing for new user models:**
+   - Import `CryptContext` from passlib
+   - Use `pwd_context.hash(password)` before storing passwords
+   - Never return plaintext or hashed passwords in responses
 
 ### Common Customizations
 
@@ -454,15 +571,21 @@ SOFTWARE.
 Future enhancements under consideration:
 
 - [x] Add PUT endpoint for updating products
+- [x] Implement seller registration with password hashing
+- [x] Add HTTP status code 201 for POST endpoints
+- [ ] Use DisplaySeller response model to hide password hash from responses
+- [ ] Add seller login/authentication with JWT tokens
 - [ ] Implement pagination for product listings
 - [ ] Add search and filtering capabilities
 - [ ] Include product categories/tags
-- [ ] Add authentication and authorization
+- [ ] Add authorization and role-based access control
 - [ ] Implement rate limiting
 - [ ] Add comprehensive error handling
+- [ ] Add email validation for seller registration
 - [ ] Create Docker containerization
 - [ ] Set up CI/CD pipeline
 - [ ] Add request/response logging
+- [ ] Implement password strength validation
 
 ## Support
 
@@ -478,6 +601,8 @@ Built with:
 - [SQLAlchemy](https://www.sqlalchemy.org/) - SQL toolkit and ORM
 - [Pydantic](https://pydantic-docs.helpmanual.io/) - Data validation
 - [Uvicorn](https://www.uvicorn.org/) - ASGI server
+- [Passlib](https://passlib.readthedocs.io/) - Password hashing library
+- [Bcrypt](https://github.com/pyca/bcrypt/) - Secure password hashing algorithm
 
 ---
 
