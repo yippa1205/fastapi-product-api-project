@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, status
 from sqlalchemy.sql.functions import mode
 from fastapi.params import Depends
 from sqlalchemy.orm import Session
@@ -7,10 +7,13 @@ from . import models
 from .database import engine, Base, SessionLocal
 from .models import Product
 from typing import List
+from passlib.context import CryptContext
 
 app = FastAPI()
 
 Base.metadata.create_all(engine)
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated = "auto")
 
 def get_db():
     db = SessionLocal()
@@ -52,7 +55,7 @@ def product(id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"Product with id {id} not found")
     return product
 
-@app.post('/product')
+@app.post('/product', status_code=status.HTTP_201_CREATED)
 def add(request: schemas.Product, db: Session = Depends(get_db)):
     new_product = models.Product(
         name=request.name, 
@@ -62,6 +65,19 @@ def add(request: schemas.Product, db: Session = Depends(get_db)):
     db.add(new_product)
     db.commit()
     db.refresh(new_product)
-    return request
+    return new_product
 
-    
+# @app.post('/seller', response_model = schemas.DisplaySeller)
+@app.post('/seller')
+def create_seller(request: schemas.Seller, db: Session = Depends(get_db)):
+    hashedpassword = pwd_context.hash(request.password)
+    new_seller = models.Seller(
+        username = request.username, 
+        email = request.email, 
+        password = hashedpassword
+    )
+    db.add(new_seller)
+    db.commit()
+    db.refresh(new_seller)
+    return new_seller
+
