@@ -91,6 +91,7 @@ The API will be available at:
 | `GET` | `/products` | Retrieve all products | None |
 | `GET` | `/product/{id}` | Retrieve a single product by ID | None |
 | `POST` | `/product` | Create a new product | Product object |
+| `PUT` | `/product/{id}` | Update an existing product by ID | Product object |
 | `DELETE` | `/product/{id}` | Delete a product by ID | None |
 
 ### Data Model
@@ -177,6 +178,26 @@ curl -X GET "http://localhost:8000/product/1"
 }
 ```
 
+#### Update a Product
+
+**Request:**
+```bash
+curl -X PUT "http://localhost:8000/product/1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Gaming Laptop",
+    "description": "High-performance gaming laptop with RTX 4080",
+    "price": 199999
+  }'
+```
+
+**Response:**
+```json
+{
+  "Product: 1 is successfully updated"
+}
+```
+
 #### Delete a Product
 
 **Request:**
@@ -187,7 +208,8 @@ curl -X DELETE "http://localhost:8000/product/1"
 **Response:**
 ```json
 {
-  "product deleted": null
+  "message": "Product deleted successfully",
+  "id": 1
 }
 ```
 
@@ -215,6 +237,15 @@ print(f"Total products: {len(products)}")
 # Get specific product
 product_id = 1
 response = requests.get(f"{BASE_URL}/product/{product_id}")
+print(response.json())
+
+# Update product
+updated_product = {
+    "name": "Wireless Keyboard",
+    "description": "Mechanical gaming keyboard with RGB",
+    "price": 12999
+}
+response = requests.put(f"{BASE_URL}/product/{product_id}", json=updated_product)
 print(response.json())
 
 # Delete product
@@ -263,20 +294,19 @@ SQLALCHEMY_DATABASE_URL = "postgresql://user:password@localhost/dbname"
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 ```
 
-**Add Update (PUT) Endpoint:**
+**Enable CORS for Frontend Integration:**
 
 Add to [Product/main.py](Product/main.py):
 ```python
-@app.put('/product/{id}')
-def update(id: int, request: schemas.Product, db: Session = Depends(get_db)):
-    product = db.query(models.Product).filter(models.Product.id == id).first()
-    if product:
-        product.name = request.name
-        product.description = request.description
-        product.price = request.price
-        db.commit()
-        return product
-    return {"error": "Product not found"}
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 ```
 
 ## Testing
@@ -390,7 +420,7 @@ SOFTWARE.
 
 Future enhancements under consideration:
 
-- [ ] Add PUT endpoint for updating products
+- [x] Add PUT endpoint for updating products
 - [ ] Implement pagination for product listings
 - [ ] Add search and filtering capabilities
 - [ ] Include product categories/tags
