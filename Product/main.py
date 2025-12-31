@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from sqlalchemy.sql.functions import mode
 from fastapi.params import Depends
 from sqlalchemy.orm import Session
@@ -20,10 +20,24 @@ def get_db():
 
 
 @app.delete('/product/{id}')
-def delete(id, db: Session = Depends(get_db)):
-    db.query(models.Product).filter(models.Product.id == id).delete(synchronize_session=False)
+def delete(id: int, db: Session = Depends(get_db)):
+    result = db.query(models.Product).filter(models.Product.id == id).delete(synchronize_session=False)
+    if result == 0:
+        raise HTTPException(status_code=404, detail=f"Product with id {id} not found")
     db.commit()
-    return {'product deleted'}
+    return {'message': 'Product deleted successfully', 'id': id}
+
+
+@app.put('/product/{id}')
+def update(id: int, request: schemas.Product, db: Session = Depends(get_db)):
+    product = db.query(models.Product).filter(models.Product.id == id)
+    if not product.first():
+        pass
+    product.update(request.model_dump())
+    db.commit()
+    return {f'Product: {id} is successfully updated'}
+
+
 
 @app.get('/products')
 def products(db: Session = Depends(get_db)):
@@ -31,8 +45,10 @@ def products(db: Session = Depends(get_db)):
     return products
 
 @app.get('/product/{id}')
-def product(id, db: Session = Depends(get_db)):
+def product(id: int, db: Session = Depends(get_db)):
     product = db.query(models.Product).filter(models.Product.id == id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail=f"Product with id {id} not found")
     return product
 
 @app.post('/product')
