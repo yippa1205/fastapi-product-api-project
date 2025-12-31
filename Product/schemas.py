@@ -7,3 +7,10 @@ class Product(BaseModel):
     description: str
     price: int
 
+class DisplayProduct(BaseModel):
+    name: str
+    description: str
+
+    class Config:
+        from_attributes = True
+        
