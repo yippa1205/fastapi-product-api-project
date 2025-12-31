@@ -13,6 +13,7 @@ This API enables developers to build product management systems with essential f
 - **SQLite Database**: Lightweight, file-based data persistence
 - **SQLAlchemy ORM**: Type-safe database interactions
 - **Pydantic Validation**: Automatic request/response validation
+- **Response Model Filtering**: Control which fields are exposed in API responses
 - **Interactive Documentation**: Auto-generated Swagger UI and ReDoc
 - **Dependency Injection**: Efficient database session management
 
@@ -94,9 +95,13 @@ The API will be available at:
 | `PUT` | `/product/{id}` | Update an existing product by ID | Product object |
 | `DELETE` | `/product/{id}` | Delete a product by ID | None |
 
-### Data Model
+### Data Models
 
-**Product Schema**
+The API uses two Pydantic schemas for request/response validation:
+
+#### Product Schema (Input)
+
+Used for creating and updating products.
 
 ```json
 {
@@ -111,6 +116,24 @@ The API will be available at:
 | `name` | string | Yes | Product name |
 | `description` | string | Yes | Product description |
 | `price` | integer | Yes | Product price (in cents or smallest currency unit) |
+
+#### DisplayProduct Schema (Output)
+
+Used for GET endpoints to control response data. This schema **excludes the price field** for privacy/security.
+
+```json
+{
+  "name": "string",
+  "description": "string"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Product name |
+| `description` | string | Product description |
+
+**Note:** The `price` field is intentionally hidden in GET responses using the `DisplayProduct` response model.
 
 ### Usage Examples
 
@@ -147,19 +170,17 @@ curl -X GET "http://localhost:8000/products"
 ```json
 [
   {
-    "id": 1,
     "name": "Laptop",
-    "description": "High-performance laptop with 16GB RAM",
-    "price": 129999
+    "description": "High-performance laptop with 16GB RAM"
   },
   {
-    "id": 2,
     "name": "Mouse",
-    "description": "Wireless ergonomic mouse",
-    "price": 2999
+    "description": "Wireless ergonomic mouse"
   }
 ]
 ```
+
+**Note:** This endpoint uses the `DisplayProduct` response model, which filters out the `price` field for privacy/security purposes.
 
 #### Get Single Product
 
@@ -171,12 +192,12 @@ curl -X GET "http://localhost:8000/product/1"
 **Response:**
 ```json
 {
-  "id": 1,
   "name": "Laptop",
-  "description": "High-performance laptop with 16GB RAM",
-  "price": 129999
+  "description": "High-performance laptop with 16GB RAM"
 }
 ```
+
+**Note:** This endpoint uses the `DisplayProduct` response model, which filters out the `price` field for privacy/security purposes.
 
 #### Update a Product
 
@@ -229,15 +250,17 @@ new_product = {
 response = requests.post(f"{BASE_URL}/product", json=new_product)
 print(response.json())
 
-# Get all products
+# Get all products (returns DisplayProduct - no price field)
 response = requests.get(f"{BASE_URL}/products")
 products = response.json()
 print(f"Total products: {len(products)}")
+# Output: [{"name": "Keyboard", "description": "Mechanical gaming keyboard"}, ...]
 
-# Get specific product
+# Get specific product (returns DisplayProduct - no price field)
 product_id = 1
 response = requests.get(f"{BASE_URL}/product/{product_id}")
 print(response.json())
+# Output: {"name": "Keyboard", "description": "Mechanical gaming keyboard"}
 
 # Update product
 updated_product = {
@@ -266,9 +289,19 @@ print(response.json())
 - `Product` table with auto-incrementing ID
 - Indexed primary key for efficient queries
 
-**Dependency Injection** ([Product/main.py](Product/main.py:14-19))
+**Schemas** ([Product/schemas.py](Product/schemas.py))
+- `Product`: Full schema for input validation (create/update operations)
+- `DisplayProduct`: Filtered schema for GET responses (excludes price field)
+- Uses Pydantic v2 with `from_attributes = True` for SQLAlchemy compatibility
+
+**Dependency Injection** ([Product/main.py](Product/main.py:15-19))
 - `get_db()` function provides database sessions
 - Automatic session cleanup with try/finally pattern
+
+**Response Models** ([Product/main.py](Product/main.py:42-47))
+- GET endpoints use `response_model=DisplayProduct` to filter sensitive data
+- Uses `List[DisplayProduct]` for list endpoints
+- Provides data privacy by hiding price information in public endpoints
 
 ### Adding New Features
 

@@ -6,6 +6,7 @@ from . import schemas
 from . import models
 from .database import engine, Base, SessionLocal
 from .models import Product
+from typing import List
 
 app = FastAPI()
 
@@ -38,13 +39,13 @@ def update(id: int, request: schemas.Product, db: Session = Depends(get_db)):
     return {f'Product: {id} is successfully updated'}
 
 
-
-@app.get('/products')
+# @app.get('/products')
+@app.get('/products', response_model = List[schemas.DisplayProduct])
 def products(db: Session = Depends(get_db)):
     products = db.query(models.Product).all()
     return products
 
-@app.get('/product/{id}')
+@app.get('/product/{id}', response_model = schemas.DisplayProduct)
 def product(id: int, db: Session = Depends(get_db)):
     product = db.query(models.Product).filter(models.Product.id == id).first()
     if not product:
