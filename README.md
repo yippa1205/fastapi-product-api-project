@@ -10,10 +10,12 @@ This API enables developers to build product management systems with essential f
 
 - **Full CRUD Operations**: Complete product lifecycle management
 - **Seller Registration**: Secure user account creation with password hashing
+- **Product-Seller Relationships**: Products linked to sellers via foreign keys with bidirectional relationships
+- **Nested Response Models**: Product responses include seller information
 - **Password Security**: Bcrypt-based password hashing using passlib
 - **RESTful API Design**: Clean, intuitive endpoint structure
 - **SQLite Database**: Lightweight, file-based data persistence
-- **SQLAlchemy ORM**: Type-safe database interactions
+- **SQLAlchemy ORM**: Type-safe database interactions with relationships
 - **Pydantic Validation**: Automatic request/response validation
 - **Response Model Filtering**: Control which fields are exposed in API responses
 - **HTTP Status Codes**: Proper status code handling (201 Created for POST endpoints)
@@ -38,8 +40,8 @@ fastapi_project/
 
 ### Components
 
-- **Models** ([Product/models.py](Product/models.py)): Defines the database schema using SQLAlchemy ORM (Product and Seller tables)
-- **Schemas** ([Product/schemas.py](Product/schemas.py)): Pydantic models for request/response validation (includes DisplaySeller for response filtering)
+- **Models** ([Product/models.py](Product/models.py)): Defines the database schema using SQLAlchemy ORM (Product and Seller tables with relationships)
+- **Schemas** ([Product/schemas.py](Product/schemas.py)): Pydantic models for request/response validation with nested models (DisplayProduct includes DisplaySeller)
 - **Database** ([Product/database.py](Product/database.py)): Database engine configuration and session factory
 - **API Routes** ([Product/main.py](Product/main.py)): FastAPI endpoints for product operations and seller registration
 - **Security** ([Product/main.py](Product/main.py:16)): Password hashing context using passlib with bcrypt
@@ -133,12 +135,16 @@ Used for creating and updating products.
 
 ##### DisplayProduct Schema (Output)
 
-Used for GET endpoints to control response data. This schema **excludes the price field** for privacy/security.
+Used for GET endpoints to control response data. This schema **excludes the price field** for privacy/security and **includes nested seller information**.
 
 ```json
 {
   "name": "string",
-  "description": "string"
+  "description": "string",
+  "seller": {
+    "username": "string",
+    "email": "string"
+  }
 }
 ```
 
@@ -146,8 +152,9 @@ Used for GET endpoints to control response data. This schema **excludes the pric
 |-------|------|-------------|
 | `name` | string | Product name |
 | `description` | string | Product description |
+| `seller` | DisplaySeller | Seller information (username and email) |
 
-**Note:** The `price` field is intentionally hidden in GET responses using the `DisplayProduct` response model.
+**Note:** The `price` field is intentionally hidden in GET responses using the `DisplayProduct` response model. Seller information is included through a nested `DisplaySeller` object.
 
 #### Seller Schemas
 
@@ -226,16 +233,24 @@ curl -X GET "http://localhost:8000/products"
 [
   {
     "name": "Laptop",
-    "description": "High-performance laptop with 16GB RAM"
+    "description": "High-performance laptop with 16GB RAM",
+    "seller": {
+      "username": "john_seller",
+      "email": "john@example.com"
+    }
   },
   {
     "name": "Mouse",
-    "description": "Wireless ergonomic mouse"
+    "description": "Wireless ergonomic mouse",
+    "seller": {
+      "username": "john_seller",
+      "email": "john@example.com"
+    }
   }
 ]
 ```
 
-**Note:** This endpoint uses the `DisplayProduct` response model, which filters out the `price` field for privacy/security purposes.
+**Note:** This endpoint uses the `DisplayProduct` response model, which filters out the `price` field for privacy/security purposes and includes the seller information for each product.
 
 ##### Get Single Product
 
@@ -248,11 +263,15 @@ curl -X GET "http://localhost:8000/product/1"
 ```json
 {
   "name": "Laptop",
-  "description": "High-performance laptop with 16GB RAM"
+  "description": "High-performance laptop with 16GB RAM",
+  "seller": {
+    "username": "john_seller",
+    "email": "john@example.com"
+  }
 }
 ```
 
-**Note:** This endpoint uses the `DisplayProduct` response model, which filters out the `price` field for privacy/security purposes.
+**Note:** This endpoint uses the `DisplayProduct` response model, which filters out the `price` field for privacy/security purposes and includes the seller information.
 
 ##### Update a Product
 
@@ -343,17 +362,17 @@ response = requests.post(f"{BASE_URL}/product", json=new_product)
 print(response.json())
 print(f"Status Code: {response.status_code}")  # 201 Created
 
-# Get all products (returns DisplayProduct - no price field)
+# Get all products (returns DisplayProduct with seller info, no price field)
 response = requests.get(f"{BASE_URL}/products")
 products = response.json()
 print(f"Total products: {len(products)}")
-# Output: [{"name": "Keyboard", "description": "Mechanical gaming keyboard"}, ...]
+# Output: [{"name": "Keyboard", "description": "Mechanical gaming keyboard", "seller": {"username": "alice_seller", "email": "alice@example.com"}}, ...]
 
-# Get specific product (returns DisplayProduct - no price field)
+# Get specific product (returns DisplayProduct with seller info, no price field)
 product_id = 1
 response = requests.get(f"{BASE_URL}/product/{product_id}")
 print(response.json())
-# Output: {"name": "Keyboard", "description": "Mechanical gaming keyboard"}
+# Output: {"name": "Keyboard", "description": "Mechanical gaming keyboard", "seller": {"username": "alice_seller", "email": "alice@example.com"}}
 
 # Update product
 updated_product = {
@@ -379,15 +398,18 @@ print(response.json())
 - Configured with `check_same_thread=False` for FastAPI compatibility
 
 **Models** ([Product/models.py](Product/models.py))
-- `Product` table with auto-incrementing ID, name, description, and price fields
+- `Product` table with auto-incrementing ID, name, description, price, and seller_id fields
 - `Seller` table with auto-incrementing ID, username, email, and password fields
+- Foreign key relationship: Product.seller_id → Seller.id
+- Bidirectional relationships: Product.seller and Seller.products
 - Indexed primary keys for efficient queries
 
 **Schemas** ([Product/schemas.py](Product/schemas.py))
 - `Product`: Full schema for input validation (create/update operations)
-- `DisplayProduct`: Filtered schema for GET responses (excludes price field)
+- `DisplayProduct`: Filtered schema for GET responses (excludes price field, includes nested DisplaySeller)
 - `Seller`: Full schema for seller registration input
 - `DisplaySeller`: Filtered schema for seller responses (excludes password field)
+- Nested models: DisplayProduct contains DisplaySeller to show product ownership
 - Uses Pydantic v2 with `from_attributes = True` for SQLAlchemy compatibility
 
 **Security** ([Product/main.py](Product/main.py:16))
@@ -403,6 +425,7 @@ print(response.json())
 - GET endpoints use `response_model=DisplayProduct` to filter sensitive data
 - Uses `List[DisplayProduct]` for list endpoints
 - Provides data privacy by hiding price information in public endpoints
+- Nested models automatically populate seller information via SQLAlchemy relationships
 
 **HTTP Status Codes** ([Product/main.py](Product/main.py:58))
 - POST `/product` endpoint returns 201 Created status code
@@ -421,6 +444,7 @@ To extend the API with additional functionality:
    - Create a new model class in [Product/models.py](Product/models.py)
    - Create corresponding Pydantic schemas in [Product/schemas.py](Product/schemas.py)
    - Consider creating a Display schema to filter sensitive fields
+   - Add relationships if needed (foreign keys and bidirectional relationships)
    - Add endpoints in [Product/main.py](Product/main.py)
 
 3. **Add a new endpoint:**

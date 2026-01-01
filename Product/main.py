@@ -60,7 +60,8 @@ def add(request: schemas.Product, db: Session = Depends(get_db)):
     new_product = models.Product(
         name=request.name, 
         description=request.description, 
-        price=request.price
+        price=request.price,
+        seller_id = 1
     )
     db.add(new_product)
     db.commit()
