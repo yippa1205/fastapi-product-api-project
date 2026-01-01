@@ -122,10 +122,13 @@ The project has been refactored to use FastAPI's APIRouter pattern, which provid
 - **Clean Main File**: The main.py file focuses on app configuration and router registration, not business logic
 
 **How It Works:**
-1. Each router file (e.g., [product.py](Product/routers/product.py)) creates an `APIRouter()` instance
+1. Each router file (e.g., [product.py](Product/routers/product.py)) creates an `APIRouter()` instance with configuration:
+   - `prefix`: URL prefix for all routes in the router (e.g., `"/product"`)
+   - `tags`: OpenAPI tags for grouping endpoints in documentation
 2. Endpoints are decorated with `@router.get()`, `@router.post()`, etc. instead of `@app.get()`
-3. Routers are registered in [main.py](Product/main.py:18-19) using `app.include_router()`
-4. All endpoints from registered routers become part of the main FastAPI application
+3. Route paths in decorators are simplified (e.g., `@router.get('/{id}')` instead of `@router.get('/product/{id}')`) because the prefix is applied automatically
+4. Routers are registered in [main.py](Product/main.py:18-19) using `app.include_router()`
+5. All endpoints from registered routers become part of the main FastAPI application
 
 ## Getting Started
 
@@ -501,12 +504,15 @@ print(response.json())
 - Routers are registered in [Product/main.py](Product/main.py:18-19) using `app.include_router()`
 
 **Product Router** ([Product/routers/product.py](Product/routers/product.py))
+- Configured with `prefix="/product"` and `tags=['Product']` for clean URL structure and documentation grouping
 - All product CRUD operations (GET, POST, PUT, DELETE)
+- Simplified route paths (e.g., `/{id}` instead of `/product/{id}`) due to prefix configuration
 - Uses `response_model=DisplayProduct` for GET endpoints to filter sensitive data
 - Returns 201 Created status code for POST operations
 - Proper error handling with HTTPException for 404 cases
 
 **Seller Router** ([Product/routers/seller.py](Product/routers/seller.py))
+- Configured with `tags=['Seller']` for documentation grouping
 - Seller registration endpoint
 - Password hashing using passlib with bcrypt
 - `pwd_context` configured with bcrypt scheme
@@ -541,7 +547,7 @@ To extend the API with additional functionality using the router pattern:
    - Use dependency injection for database access with `db: Session = Depends(get_db)`
    - Follow existing patterns for consistency
    - Use appropriate HTTP status codes (201 for POST, 404 for not found)
-   - Add `tags` parameter to organize endpoints in API documentation
+   - No need to add `tags` to individual routes since they're configured in the router initialization
 
 4. **Create a new router module:**
    ```python
@@ -551,9 +557,12 @@ To extend the API with additional functionality using the router pattern:
    from ..database import get_db
    from .. import schemas, models
 
-   router = APIRouter()
+   router = APIRouter(
+       tags=['Resource'],
+       prefix="/resource"
+   )
 
-   @router.get('/resource', tags=['Resource'])
+   @router.get('/')
    def get_resources(db: Session = Depends(get_db)):
        # Your implementation
        pass
@@ -563,6 +572,8 @@ To extend the API with additional functionality using the router pattern:
    from .routers import product, seller, new_resource
    app.include_router(new_resource.router)
    ```
+
+   **Best Practice:** Configure `tags` and `prefix` in the APIRouter initialization rather than in individual route decorators for cleaner, more maintainable code.
 
 5. **Implement password hashing for new user models:**
    - Import `CryptContext` from passlib in your router
