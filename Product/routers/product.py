@@ -7,7 +7,7 @@ from .. import models
 from typing import List
 
 router = APIRouter(
-    tags=['Product']
+    tags=['Product'],
     prefix="/product"
 )
 
