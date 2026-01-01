@@ -13,23 +13,28 @@ This API enables developers to build product management systems with essential f
 - **Product-Seller Relationships**: Products linked to sellers via foreign keys with bidirectional relationships
 - **Nested Response Models**: Product responses include seller information
 - **Password Security**: Bcrypt-based password hashing using passlib
+- **Modular Router Architecture**: Organized code with separate routers for each resource type
 - **RESTful API Design**: Clean, intuitive endpoint structure
 - **SQLite Database**: Lightweight, file-based data persistence
 - **SQLAlchemy ORM**: Type-safe database interactions with relationships
 - **Pydantic Validation**: Automatic request/response validation
 - **Response Model Filtering**: Control which fields are exposed in API responses
 - **HTTP Status Codes**: Proper status code handling (201 Created for POST endpoints)
-- **Interactive Documentation**: Auto-generated Swagger UI and ReDoc
+- **Interactive Documentation**: Auto-generated Swagger UI and ReDoc with organized tags
 - **Dependency Injection**: Efficient database session management
 
 ## Architecture
 
-The project follows a modular architecture with clear separation of concerns:
+The project follows a modular architecture with clear separation of concerns and router-based organization:
 
 ```
 fastapi_project/
 ├── Product/
-│   ├── main.py          # API endpoints and route handlers
+│   ├── routers/
+│   │   ├── __init__.py
+│   │   ├── product.py   # Product-related endpoints
+│   │   └── seller.py    # Seller-related endpoints
+│   ├── main.py          # Application setup and router registration
 │   ├── models.py        # SQLAlchemy database models
 │   ├── schemas.py       # Pydantic schemas for validation
 │   └── database.py      # Database configuration and session management
@@ -43,8 +48,84 @@ fastapi_project/
 - **Models** ([Product/models.py](Product/models.py)): Defines the database schema using SQLAlchemy ORM (Product and Seller tables with relationships)
 - **Schemas** ([Product/schemas.py](Product/schemas.py)): Pydantic models for request/response validation with nested models (DisplayProduct includes DisplaySeller)
 - **Database** ([Product/database.py](Product/database.py)): Database engine configuration and session factory
-- **API Routes** ([Product/main.py](Product/main.py)): FastAPI endpoints for product operations and seller registration
-- **Security** ([Product/main.py](Product/main.py:16)): Password hashing context using passlib with bcrypt
+- **Main Application** ([Product/main.py](Product/main.py)): FastAPI app setup, router registration, and metadata configuration
+- **Product Router** ([Product/routers/product.py](Product/routers/product.py)): Product CRUD endpoints (GET, POST, PUT, DELETE)
+- **Seller Router** ([Product/routers/seller.py](Product/routers/seller.py)): Seller registration endpoint with password hashing
+
+### Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        FastAPI Application                       │
+│                         (Product/main.py)                        │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  App Metadata: Title, Description, Contact, Docs Config    │ │
+│  └────────────────────────────────────────────────────────────┘ │
+└───────────────────────┬─────────────────────────────────────────┘
+                        │
+                        │ includes routers
+        ┌───────────────┼───────────────┐
+        │               │               │
+        ▼               ▼               ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│   Product    │ │    Seller    │ │  Future      │
+│   Router     │ │    Router    │ │  Routers...  │
+│              │ │              │ │              │
+│ product.py   │ │  seller.py   │ │  (expandable)│
+└──────┬───────┘ └──────┬───────┘ └──────────────┘
+       │                │
+       │ uses           │ uses
+       │                │
+       ├────────────────┴──────────────┬─────────────┐
+       │                               │             │
+       ▼                               ▼             ▼
+┌──────────────┐              ┌──────────────┐ ┌──────────────┐
+│   Schemas    │              │   Models     │ │   Database   │
+│  (Pydantic)  │              │ (SQLAlchemy) │ │   Session    │
+│              │              │              │ │              │
+│ schemas.py   │              │  models.py   │ │ database.py  │
+│              │              │              │ │              │
+│ - Product    │              │ - Product    │ │ - Engine     │
+│ - Display    │              │   Table      │ │ - SessionMkr │
+│   Product    │              │ - Seller     │ │ - get_db()   │
+│ - Seller     │              │   Table      │ │   dependency │
+│ - Display    │              │ - Relations  │ │              │
+│   Seller     │              │              │ │              │
+└──────────────┘              └──────┬───────┘ └──────────────┘
+                                     │
+                                     │ persists to
+                                     ▼
+                              ┌──────────────┐
+                              │   SQLite     │
+                              │   Database   │
+                              │              │
+                              │ product.db   │
+                              └──────────────┘
+
+Request Flow:
+─────────────
+HTTP Request → FastAPI App → Router → Validate with Schema →
+→ Query Database via Model → Return Response (filtered by Display Schema)
+```
+
+### Why Router-Based Architecture?
+
+The project has been refactored to use FastAPI's APIRouter pattern, which provides several advantages:
+
+**Benefits:**
+- **Separation of Concerns**: Each router handles a specific resource type (products, sellers), making code easier to understand and maintain
+- **Scalability**: Easy to add new resource types by creating new router files without cluttering the main application
+- **Team Collaboration**: Different team members can work on different routers without conflicts
+- **Testing**: Individual routers can be tested in isolation
+- **Code Organization**: Related endpoints are grouped together with clear file boundaries
+- **Reusability**: Routers can be reused across different FastAPI applications
+- **Clean Main File**: The main.py file focuses on app configuration and router registration, not business logic
+
+**How It Works:**
+1. Each router file (e.g., [product.py](Product/routers/product.py)) creates an `APIRouter()` instance
+2. Endpoints are decorated with `@router.get()`, `@router.post()`, etc. instead of `@app.get()`
+3. Routers are registered in [main.py](Product/main.py:18-19) using `app.include_router()`
+4. All endpoints from registered routers become part of the main FastAPI application
 
 ## Getting Started
 
@@ -392,10 +473,11 @@ print(response.json())
 
 ### Project Structure Details
 
-**Database Configuration** ([Product/database.py](Product/database.py:6))
+**Database Configuration** ([Product/database.py](Product/database.py))
 - Uses SQLite for lightweight, file-based storage
 - Connection string: `sqlite:///./product.db`
 - Configured with `check_same_thread=False` for FastAPI compatibility
+- Provides `get_db()` dependency for session management
 
 **Models** ([Product/models.py](Product/models.py))
 - `Product` table with auto-incrementing ID, name, description, price, and seller_id fields
@@ -412,49 +494,79 @@ print(response.json())
 - Nested models: DisplayProduct contains DisplaySeller to show product ownership
 - Uses Pydantic v2 with `from_attributes = True` for SQLAlchemy compatibility
 
-**Security** ([Product/main.py](Product/main.py:16))
-- `pwd_context`: Password hashing context using passlib with bcrypt
+**Router Pattern** ([Product/routers/](Product/routers/))
+- Modular organization using FastAPI's APIRouter
+- Separate routers for different resource types (products, sellers)
+- Each router is independently testable and maintainable
+- Routers are registered in [Product/main.py](Product/main.py:18-19) using `app.include_router()`
+
+**Product Router** ([Product/routers/product.py](Product/routers/product.py))
+- All product CRUD operations (GET, POST, PUT, DELETE)
+- Uses `response_model=DisplayProduct` for GET endpoints to filter sensitive data
+- Returns 201 Created status code for POST operations
+- Proper error handling with HTTPException for 404 cases
+
+**Seller Router** ([Product/routers/seller.py](Product/routers/seller.py))
+- Seller registration endpoint
+- Password hashing using passlib with bcrypt
+- `pwd_context` configured with bcrypt scheme
 - Passwords are automatically hashed before database storage
-- Uses bcrypt version 4.1.2 for secure password hashing
 
-**Dependency Injection** ([Product/main.py](Product/main.py:18-23))
-- `get_db()` function provides database sessions
-- Automatic session cleanup with try/finally pattern
-
-**Response Models** ([Product/main.py](Product/main.py:46-56))
-- GET endpoints use `response_model=DisplayProduct` to filter sensitive data
-- Uses `List[DisplayProduct]` for list endpoints
-- Provides data privacy by hiding price information in public endpoints
-- Nested models automatically populate seller information via SQLAlchemy relationships
-
-**HTTP Status Codes** ([Product/main.py](Product/main.py:58))
-- POST `/product` endpoint returns 201 Created status code
-- Proper REST API status code implementation
+**Main Application** ([Product/main.py](Product/main.py))
+- FastAPI app initialization with metadata (title, description, contact info)
+- Router registration for modular endpoint organization
+- Database table creation on startup
+- Customizable API documentation URLs
 
 ### Adding New Features
 
-To extend the API with additional functionality:
+To extend the API with additional functionality using the router pattern:
 
 1. **Add a new field to an existing model:**
    - Update the model in [Product/models.py](Product/models.py)
    - Update the corresponding schema in [Product/schemas.py](Product/schemas.py)
+   - Update the relevant router endpoint if needed
    - Delete `product.db` to recreate the database with new schema
 
-2. **Add a new database table:**
+2. **Add a new database table with its own router:**
    - Create a new model class in [Product/models.py](Product/models.py)
    - Create corresponding Pydantic schemas in [Product/schemas.py](Product/schemas.py)
    - Consider creating a Display schema to filter sensitive fields
    - Add relationships if needed (foreign keys and bidirectional relationships)
-   - Add endpoints in [Product/main.py](Product/main.py)
+   - **Create a new router file** in [Product/routers/](Product/routers/) (e.g., `category.py`)
+   - Register the new router in [Product/main.py](Product/main.py) using `app.include_router()`
 
-3. **Add a new endpoint:**
-   - Define the route in [Product/main.py](Product/main.py)
-   - Use dependency injection for database access
+3. **Add a new endpoint to an existing resource:**
+   - Add the route to the appropriate router file ([product.py](Product/routers/product.py) or [seller.py](Product/routers/seller.py))
+   - Use dependency injection for database access with `db: Session = Depends(get_db)`
    - Follow existing patterns for consistency
-   - Use appropriate HTTP status codes
+   - Use appropriate HTTP status codes (201 for POST, 404 for not found)
+   - Add `tags` parameter to organize endpoints in API documentation
 
-4. **Implement password hashing for new user models:**
-   - Import `CryptContext` from passlib
+4. **Create a new router module:**
+   ```python
+   # Product/routers/new_resource.py
+   from fastapi import APIRouter, Depends
+   from sqlalchemy.orm import Session
+   from ..database import get_db
+   from .. import schemas, models
+
+   router = APIRouter()
+
+   @router.get('/resource', tags=['Resource'])
+   def get_resources(db: Session = Depends(get_db)):
+       # Your implementation
+       pass
+   ```
+   Then register in [Product/main.py](Product/main.py):
+   ```python
+   from .routers import product, seller, new_resource
+   app.include_router(new_resource.router)
+   ```
+
+5. **Implement password hashing for new user models:**
+   - Import `CryptContext` from passlib in your router
+   - Create `pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")`
    - Use `pwd_context.hash(password)` before storing passwords
    - Never return plaintext or hashed passwords in responses
 
