@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from .database import engine, Base
-from .routers import product, seller
+from .routers import product, seller, login
 
 app = FastAPI(
     title="Products API written by Patrick Yip",
@@ -17,6 +17,7 @@ app = FastAPI(
 
 app.include_router(product.router)
 app.include_router(seller.router)
+app.include_router(login.router)
 
 Base.metadata.create_all(engine)
 

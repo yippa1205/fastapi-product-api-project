@@ -1,6 +1,7 @@
 # To share product data with end users, create a structured Pydantic data model first
 
 from pydantic import BaseModel
+from typing import Optional
 
 class Product(BaseModel):
     name: str
@@ -26,6 +27,18 @@ class Seller(BaseModel):
     username: str
     email: str
     password: str
+
+class Login(BaseModel):
+    username: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
 
 
 

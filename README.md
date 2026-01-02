@@ -1,18 +1,21 @@
 # FastAPI Product Management API
 
-A lightweight RESTful API for managing product inventory and seller accounts, built with FastAPI and SQLAlchemy. This project provides a simple yet robust backend solution for product CRUD (Create, Read, Update, Delete) operations and seller registration with SQLite database persistence.
+A lightweight RESTful API for managing product inventory and seller accounts, built with FastAPI and SQLAlchemy. This project provides a simple yet robust backend solution for product CRUD (Create, Read, Update, Delete) operations, seller registration, and JWT-based authentication with SQLite database persistence.
 
 ## Overview
 
-This API enables developers to build product management systems with essential features for creating, retrieving, updating, and deleting product records, as well as secure seller account registration. It's ideal for e-commerce applications, inventory management systems, or as a learning resource for FastAPI development.
+This API enables developers to build product management systems with essential features for creating, retrieving, updating, and deleting product records, as well as secure seller account registration and JWT-based authentication. It's ideal for e-commerce applications, inventory management systems, or as a learning resource for FastAPI development with authentication.
 
 ### Key Features
 
 - **Full CRUD Operations**: Complete product lifecycle management
+- **JWT Authentication**: Secure token-based authentication with OAuth2 password bearer flow
 - **Seller Registration**: Secure user account creation with password hashing
+- **Seller Login**: Authentication endpoint with JWT token generation
 - **Product-Seller Relationships**: Products linked to sellers via foreign keys with bidirectional relationships
 - **Nested Response Models**: Product responses include seller information
 - **Password Security**: Bcrypt-based password hashing using passlib
+- **Token-Based Security**: JWT tokens with configurable expiration (20 minutes default)
 - **Modular Router Architecture**: Organized code with separate routers for each resource type
 - **RESTful API Design**: Clean, intuitive endpoint structure
 - **SQLite Database**: Lightweight, file-based data persistence
@@ -33,7 +36,8 @@ fastapi_project/
 │   ├── routers/
 │   │   ├── __init__.py
 │   │   ├── product.py   # Product-related endpoints
-│   │   └── seller.py    # Seller-related endpoints
+│   │   ├── seller.py    # Seller-related endpoints
+│   │   └── login.py     # Authentication endpoints (JWT login)
 │   ├── main.py          # Application setup and router registration
 │   ├── models.py        # SQLAlchemy database models
 │   ├── schemas.py       # Pydantic schemas for validation
@@ -46,11 +50,12 @@ fastapi_project/
 ### Components
 
 - **Models** ([Product/models.py](Product/models.py)): Defines the database schema using SQLAlchemy ORM (Product and Seller tables with relationships)
-- **Schemas** ([Product/schemas.py](Product/schemas.py)): Pydantic models for request/response validation with nested models (DisplayProduct includes DisplaySeller)
+- **Schemas** ([Product/schemas.py](Product/schemas.py)): Pydantic models for request/response validation with nested models (DisplayProduct includes DisplaySeller, Login, Token, TokenData)
 - **Database** ([Product/database.py](Product/database.py)): Database engine configuration and session factory
 - **Main Application** ([Product/main.py](Product/main.py)): FastAPI app setup, router registration, and metadata configuration
 - **Product Router** ([Product/routers/product.py](Product/routers/product.py)): Product CRUD endpoints (GET, POST, PUT, DELETE)
 - **Seller Router** ([Product/routers/seller.py](Product/routers/seller.py)): Seller registration endpoint with password hashing
+- **Login Router** ([Product/routers/login.py](Product/routers/login.py)): Authentication endpoint with JWT token generation and password verification
 
 ### Architecture Diagram
 
@@ -64,19 +69,19 @@ fastapi_project/
 └───────────────────────┬─────────────────────────────────────────┘
                         │
                         │ includes routers
-        ┌───────────────┼───────────────┐
-        │               │               │
-        ▼               ▼               ▼
-┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-│   Product    │ │    Seller    │ │  Future      │
-│   Router     │ │    Router    │ │  Routers...  │
-│              │ │              │ │              │
-│ product.py   │ │  seller.py   │ │  (expandable)│
-└──────┬───────┘ └──────┬───────┘ └──────────────┘
-       │                │
-       │ uses           │ uses
-       │                │
-       ├────────────────┴──────────────┬─────────────┐
+        ┌───────────────┼───────────────┬───────────────┐
+        │               │               │               │
+        ▼               ▼               ▼               ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│   Product    │ │    Seller    │ │    Login     │ │  Future      │
+│   Router     │ │    Router    │ │    Router    │ │  Routers...  │
+│              │ │              │ │              │ │              │
+│ product.py   │ │  seller.py   │ │  login.py    │ │  (expandable)│
+└──────┬───────┘ └──────┬───────┘ └──────┬───────┘ └──────────────┘
+       │                │                │
+       │ uses           │ uses           │ uses
+       │                │                │
+       ├────────────────┴────────────────┴─────────────┬─────────────┐
        │                               │             │
        ▼                               ▼             ▼
 ┌──────────────┐              ┌──────────────┐ ┌──────────────┐
@@ -158,7 +163,19 @@ The project has been refactored to use FastAPI's APIRouter pattern, which provid
 
 ### Environment Setup
 
-No additional environment variables are required. The application uses SQLite with a local database file (`product.db`) that will be created automatically on first run.
+No additional environment variables are required for basic operation. The application uses SQLite with a local database file (`product.db`) that will be created automatically on first run.
+
+**Security Note:** The JWT secret key is currently hardcoded in [Product/routers/login.py](Product/routers/login.py). For production deployments, you should:
+1. Move the `SECRET_KEY` to environment variables
+2. Generate a secure random secret key (use `openssl rand -hex 32`)
+3. Never commit the secret key to version control
+
+Example environment variable setup:
+```bash
+export JWT_SECRET_KEY="your-secure-random-secret-key-here"
+export JWT_ALGORITHM="HS256"
+export ACCESS_TOKEN_EXPIRE_MINUTES=20
+```
 
 ### Running the Application
 
@@ -192,6 +209,12 @@ The API will be available at:
 | Method | Endpoint | Description | Request Body | Status Code |
 |--------|----------|-------------|--------------|-------------|
 | `POST` | `/seller` | Create a new seller account | Seller object | 200 OK |
+
+#### Authentication Endpoints
+
+| Method | Endpoint | Description | Request Body | Status Code |
+|--------|----------|-------------|--------------|-------------|
+| `POST` | `/login` | Authenticate seller and receive JWT token | Login credentials | 200 OK |
 
 ### Data Models
 
@@ -277,6 +300,50 @@ Used for seller registration responses. This schema **excludes the password fiel
 | `email` | string | Seller's email address |
 
 **Note:** The `password` field is never returned in responses. Passwords are hashed using bcrypt before storage.
+
+#### Authentication Schemas
+
+##### Login Schema (Input)
+
+Used for authenticating sellers.
+
+```json
+{
+  "username": "string",
+  "password": "string"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `username` | string | Yes | Seller's username |
+| `password` | string | Yes | Seller's password (plaintext for authentication) |
+
+##### Token Schema (Output)
+
+Returned after successful authentication.
+
+```json
+{
+  "access_token": "string",
+  "token_type": "bearer"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `access_token` | string | JWT access token (valid for 20 minutes) |
+| `token_type` | string | Token type (always "bearer") |
+
+##### TokenData Schema
+
+Internal schema for JWT token payload.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `username` | string (optional) | Username extracted from JWT token |
+
+**Note:** JWT tokens are signed using HS256 algorithm and expire after 20 minutes by default.
 
 ### Usage Examples
 
@@ -419,6 +486,43 @@ curl -X POST "http://localhost:8000/seller" \
 
 **Note:** The password is automatically hashed using bcrypt before storage. In production, you may want to use the `DisplaySeller` response model to hide the hashed password from the response.
 
+#### Authentication Operations
+
+##### Login to Get JWT Token
+
+**Request:**
+```bash
+curl -X POST "http://localhost:8000/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "john_seller",
+    "password": "SecurePassword123"
+  }'
+```
+
+**Response:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqb2huX3NlbGxlciIsImV4cCI6MTcwOTQ5MzYwMH0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+  "token_type": "bearer"
+}
+```
+
+**Authentication Flow:**
+1. Seller provides username and password
+2. System verifies username exists in database
+3. System verifies password using bcrypt hash comparison
+4. If valid, system generates JWT token with:
+   - Subject (`sub`): username
+   - Expiration (`exp`): current time + 20 minutes
+5. Returns access token and token type
+
+**Error Responses:**
+- Invalid username: `404 Not Found` - "Invalid user"
+- Invalid password: `404 Not Found` - "Invalid password"
+
+**Note:** The JWT token expires after 20 minutes. Store the token securely and include it in the `Authorization` header for protected endpoints.
+
 ### Python Client Example
 
 ```python
@@ -435,6 +539,22 @@ new_seller = {
 response = requests.post(f"{BASE_URL}/seller", json=new_seller)
 print(response.json())
 # Output: {"id": 1, "username": "alice_seller", "email": "alice@example.com", "password": "$2b$12$..."}
+
+# Login to get JWT token
+login_credentials = {
+    "username": "alice_seller",
+    "password": "MySecurePassword456"
+}
+response = requests.post(f"{BASE_URL}/login", json=login_credentials)
+token_data = response.json()
+access_token = token_data["access_token"]
+print(f"Access Token: {access_token}")
+# Output: Access Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+# Use the token in subsequent requests (for future protected endpoints)
+headers = {
+    "Authorization": f"Bearer {access_token}"
+}
 
 # Create a product
 new_product = {
@@ -518,9 +638,22 @@ print(response.json())
 - `pwd_context` configured with bcrypt scheme
 - Passwords are automatically hashed before database storage
 
+**Login Router** ([Product/routers/login.py](Product/routers/login.py))
+- Configured with `tags=['Login']` for documentation grouping
+- JWT-based authentication endpoint
+- Password verification using passlib with bcrypt
+- Token generation using python-jose library
+- Token configuration:
+  - Algorithm: HS256
+  - Expiration: 20 minutes (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`)
+  - Secret key: Configured in router (should be moved to environment variables in production)
+- Authentication flow: username lookup → password verification → JWT token generation
+- Returns token in OAuth2 bearer token format
+- Proper error handling with 404 status codes for invalid credentials
+
 **Main Application** ([Product/main.py](Product/main.py))
 - FastAPI app initialization with metadata (title, description, contact info)
-- Router registration for modular endpoint organization
+- Router registration for modular endpoint organization (product, seller, login)
 - Database table creation on startup
 - Customizable API documentation URLs
 
@@ -604,6 +737,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+```
+
+**Secure JWT Configuration with Environment Variables:**
+
+Update [Product/routers/login.py](Product/routers/login.py) to use environment variables:
+```python
+import os
+
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default-secret-key-for-development")
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "20"))
+```
+
+Then set environment variables before running:
+```bash
+export JWT_SECRET_KEY=$(openssl rand -hex 32)
+export ACCESS_TOKEN_EXPIRE_MINUTES=30
+uvicorn Product.main:app --reload
 ```
 
 ## Testing
@@ -720,8 +871,10 @@ Future enhancements under consideration:
 - [x] Add PUT endpoint for updating products
 - [x] Implement seller registration with password hashing
 - [x] Add HTTP status code 201 for POST endpoints
+- [x] Add seller login/authentication with JWT tokens
 - [ ] Use DisplaySeller response model to hide password hash from responses
-- [ ] Add seller login/authentication with JWT tokens
+- [ ] Implement protected endpoints using JWT authentication
+- [ ] Move SECRET_KEY to environment variables for security
 - [ ] Implement pagination for product listings
 - [ ] Add search and filtering capabilities
 - [ ] Include product categories/tags
@@ -750,6 +903,7 @@ Built with:
 - [Uvicorn](https://www.uvicorn.org/) - ASGI server
 - [Passlib](https://passlib.readthedocs.io/) - Password hashing library
 - [Bcrypt](https://github.com/pyca/bcrypt/) - Secure password hashing algorithm
+- [Python-JOSE](https://python-jose.readthedocs.io/) - JWT token creation and validation
 
 ---
 
