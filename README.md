@@ -163,19 +163,27 @@ The project has been refactored to use FastAPI's APIRouter pattern, which provid
 
 ### Environment Setup
 
-No additional environment variables are required for basic operation. The application uses SQLite with a local database file (`product.db`) that will be created automatically on first run.
+The application uses SQLite with a local database file (`product.db`) that will be created automatically on first run.
 
-**Security Note:** The JWT secret key is currently hardcoded in [Product/routers/login.py](Product/routers/login.py). For production deployments, you should:
-1. Move the `SECRET_KEY` to environment variables
-2. Generate a secure random secret key (use `openssl rand -hex 32`)
-3. Never commit the secret key to version control
+**JWT Authentication Configuration:**
 
-Example environment variable setup:
-```bash
-export JWT_SECRET_KEY="your-secure-random-secret-key-here"
-export JWT_ALGORITHM="HS256"
-export ACCESS_TOKEN_EXPIRE_MINUTES=20
-```
+The application uses environment variables for JWT configuration. A `.env` file is included with a secure secret key.
+
+**For Development:**
+- The `.env` file is already configured with a secure random key
+- No additional setup needed - just run the application
+
+**For Production:**
+1. Generate a new secure secret key: `openssl rand -hex 32`
+2. Set environment variables in your hosting platform:
+   ```bash
+   JWT_SECRET_KEY=your-production-secret-key
+   JWT_ALGORITHM=HS256
+   ACCESS_TOKEN_EXPIRE_MINUTES=20
+   ```
+3. Never commit the production secret key to version control
+
+**Security Note:** The `.env` file is already in `.gitignore` to prevent accidentally committing secrets to version control.
 
 ### Running the Application
 
@@ -644,9 +652,9 @@ print(response.json())
 - Password verification using passlib with bcrypt
 - Token generation using python-jose library
 - Token configuration:
-  - Algorithm: HS256
+  - Algorithm: HS256 (configurable via environment variable)
   - Expiration: 20 minutes (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`)
-  - Secret key: Configured in router (should be moved to environment variables in production)
+  - Secret key: Loaded from environment variables for security
 - Authentication flow: username lookup → password verification → JWT token generation
 - Returns token in OAuth2 bearer token format
 - Proper error handling with 404 status codes for invalid credentials
@@ -872,9 +880,9 @@ Future enhancements under consideration:
 - [x] Implement seller registration with password hashing
 - [x] Add HTTP status code 201 for POST endpoints
 - [x] Add seller login/authentication with JWT tokens
+- [x] Move SECRET_KEY to environment variables for security
 - [ ] Use DisplaySeller response model to hide password hash from responses
 - [ ] Implement protected endpoints using JWT authentication
-- [ ] Move SECRET_KEY to environment variables for security
 - [ ] Implement pagination for product listings
 - [ ] Add search and filtering capabilities
 - [ ] Include product categories/tags
