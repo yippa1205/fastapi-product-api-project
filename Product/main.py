@@ -1,10 +1,11 @@
+from dotenv import load_dotenv
+
+# Load environment variables from .env file BEFORE importing routers
+load_dotenv()
+
 from fastapi import FastAPI
 from .database import engine, Base
 from .routers import product, seller, login
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
 
 app = FastAPI(
     title="Products API written by Patrick Yip",
