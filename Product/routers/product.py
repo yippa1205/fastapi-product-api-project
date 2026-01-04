@@ -1,3 +1,4 @@
+from Product.routers.login import get_current_user
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
 from sqlalchemy.orm import Session
@@ -31,12 +32,12 @@ def update(id: int, request: schemas.Product, db: Session = Depends(get_db)):
 
 # @app.get('/products')
 @router.get('/', response_model = List[schemas.DisplayProduct])
-def products(db: Session = Depends(get_db)):
+def products(db: Session = Depends(get_db), current_user: schemas.Seller = Depends(get_current_user)):
     products = db.query(models.Product).all()
     return products
 
 @router.get('/{id}', response_model = schemas.DisplayProduct)
-def product(id: int, db: Session = Depends(get_db)):
+def product(id: int, db: Session = Depends(get_db), current_user: schemas.Seller = Depends(get_current_user)):
     product = db.query(models.Product).filter(models.Product.id == id).first()
     if not product:
         raise HTTPException(status_code=404, detail=f"Product with id {id} not found")

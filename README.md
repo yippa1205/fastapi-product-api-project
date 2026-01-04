@@ -10,8 +10,9 @@ This API enables developers to build product management systems with essential f
 
 - **Full CRUD Operations**: Complete product lifecycle management
 - **JWT Authentication**: Secure token-based authentication with OAuth2 password bearer flow
+- **Protected Endpoints**: Product retrieval endpoints secured with JWT token validation
 - **Seller Registration**: Secure user account creation with password hashing
-- **Seller Login**: Authentication endpoint with JWT token generation
+- **Seller Login**: OAuth2-compliant authentication endpoint with JWT token generation
 - **Product-Seller Relationships**: Products linked to sellers via foreign keys with bidirectional relationships
 - **Nested Response Models**: Product responses include seller information
 - **Password Security**: Bcrypt-based password hashing using passlib
@@ -204,13 +205,13 @@ The API will be available at:
 
 #### Product Endpoints
 
-| Method | Endpoint | Description | Request Body | Status Code |
-|--------|----------|-------------|--------------|-------------|
-| `GET` | `/products` | Retrieve all products | None | 200 OK |
-| `GET` | `/product/{id}` | Retrieve a single product by ID | None | 200 OK |
-| `POST` | `/product` | Create a new product | Product object | 201 Created |
-| `PUT` | `/product/{id}` | Update an existing product by ID | Product object | 200 OK |
-| `DELETE` | `/product/{id}` | Delete a product by ID | None | 200 OK |
+| Method | Endpoint | Description | Request Body | Authentication | Status Code |
+|--------|----------|-------------|--------------|----------------|-------------|
+| `GET` | `/products` | Retrieve all products | None | Required (JWT) | 200 OK |
+| `GET` | `/product/{id}` | Retrieve a single product by ID | None | Required (JWT) | 200 OK |
+| `POST` | `/product` | Create a new product | Product object | None | 201 Created |
+| `PUT` | `/product/{id}` | Update an existing product by ID | Product object | None | 200 OK |
+| `DELETE` | `/product/{id}` | Delete a product by ID | None | None | 200 OK |
 
 #### Seller Endpoints
 
@@ -313,19 +314,16 @@ Used for seller registration responses. This schema **excludes the password fiel
 
 ##### Login Schema (Input)
 
-Used for authenticating sellers.
+Used for authenticating sellers. The login endpoint now uses OAuth2PasswordRequestForm, which requires form data instead of JSON.
 
-```json
-{
-  "username": "string",
-  "password": "string"
-}
-```
+**Form Data Fields:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `username` | string | Yes | Seller's username |
 | `password` | string | Yes | Seller's password (plaintext for authentication) |
+
+**Note:** The login endpoint expects `application/x-www-form-urlencoded` data, not JSON. This is compliant with the OAuth2 specification.
 
 ##### Token Schema (Output)
 
@@ -384,7 +382,8 @@ curl -X POST "http://localhost:8000/product" \
 
 **Request:**
 ```bash
-curl -X GET "http://localhost:8000/products"
+curl -X GET "http://localhost:8000/products" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 **Response:**
@@ -409,13 +408,14 @@ curl -X GET "http://localhost:8000/products"
 ]
 ```
 
-**Note:** This endpoint uses the `DisplayProduct` response model, which filters out the `price` field for privacy/security purposes and includes the seller information for each product.
+**Note:** This endpoint is protected and requires a valid JWT token in the Authorization header. It uses the `DisplayProduct` response model, which filters out the `price` field for privacy/security purposes and includes the seller information for each product.
 
 ##### Get Single Product
 
 **Request:**
 ```bash
-curl -X GET "http://localhost:8000/product/1"
+curl -X GET "http://localhost:8000/product/1" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 **Response:**
@@ -430,7 +430,7 @@ curl -X GET "http://localhost:8000/product/1"
 }
 ```
 
-**Note:** This endpoint uses the `DisplayProduct` response model, which filters out the `price` field for privacy/security purposes and includes the seller information.
+**Note:** This endpoint is protected and requires a valid JWT token in the Authorization header. It uses the `DisplayProduct` response model, which filters out the `price` field for privacy/security purposes and includes the seller information.
 
 ##### Update a Product
 
@@ -498,15 +498,16 @@ curl -X POST "http://localhost:8000/seller" \
 
 ##### Login to Get JWT Token
 
-**Request:**
+**Request (OAuth2 Form Data):**
 ```bash
 curl -X POST "http://localhost:8000/login" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "john_seller",
-    "password": "SecurePassword123"
-  }'
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=john_seller&password=SecurePassword123"
 ```
+
+**Alternative using Swagger UI:**
+
+The interactive API documentation at http://localhost:8000/docs provides an "Authorize" button that handles the OAuth2 flow automatically.
 
 **Response:**
 ```json
@@ -517,7 +518,7 @@ curl -X POST "http://localhost:8000/login" \
 ```
 
 **Authentication Flow:**
-1. Seller provides username and password
+1. Seller provides username and password as form data (OAuth2PasswordRequestForm)
 2. System verifies username exists in database
 3. System verifies password using bcrypt hash comparison
 4. If valid, system generates JWT token with:
@@ -528,8 +529,9 @@ curl -X POST "http://localhost:8000/login" \
 **Error Responses:**
 - Invalid username: `404 Not Found` - "Invalid user"
 - Invalid password: `404 Not Found` - "Invalid password"
+- Missing credentials: `422 Unprocessable Entity` - Validation error
 
-**Note:** The JWT token expires after 20 minutes. Store the token securely and include it in the `Authorization` header for protected endpoints.
+**Note:** The JWT token expires after 20 minutes. Store the token securely and include it in the `Authorization: Bearer <token>` header for protected endpoints. The login endpoint follows the OAuth2 specification and requires form data, not JSON.
 
 ### Python Client Example
 
@@ -548,18 +550,18 @@ response = requests.post(f"{BASE_URL}/seller", json=new_seller)
 print(response.json())
 # Output: {"id": 1, "username": "alice_seller", "email": "alice@example.com", "password": "$2b$12$..."}
 
-# Login to get JWT token
-login_credentials = {
+# Login to get JWT token (OAuth2 requires form data, not JSON)
+login_data = {
     "username": "alice_seller",
     "password": "MySecurePassword456"
 }
-response = requests.post(f"{BASE_URL}/login", json=login_credentials)
+response = requests.post(f"{BASE_URL}/login", data=login_data)  # Note: data, not json
 token_data = response.json()
 access_token = token_data["access_token"]
 print(f"Access Token: {access_token}")
 # Output: Access Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
-# Use the token in subsequent requests (for future protected endpoints)
+# Use the token in subsequent requests for protected endpoints
 headers = {
     "Authorization": f"Bearer {access_token}"
 }
@@ -574,15 +576,15 @@ response = requests.post(f"{BASE_URL}/product", json=new_product)
 print(response.json())
 print(f"Status Code: {response.status_code}")  # 201 Created
 
-# Get all products (returns DisplayProduct with seller info, no price field)
-response = requests.get(f"{BASE_URL}/products")
+# Get all products (PROTECTED - requires JWT token)
+response = requests.get(f"{BASE_URL}/products", headers=headers)
 products = response.json()
 print(f"Total products: {len(products)}")
 # Output: [{"name": "Keyboard", "description": "Mechanical gaming keyboard", "seller": {"username": "alice_seller", "email": "alice@example.com"}}, ...]
 
-# Get specific product (returns DisplayProduct with seller info, no price field)
+# Get specific product (PROTECTED - requires JWT token)
 product_id = 1
-response = requests.get(f"{BASE_URL}/product/{product_id}")
+response = requests.get(f"{BASE_URL}/product/{product_id}", headers=headers)
 print(response.json())
 # Output: {"name": "Keyboard", "description": "Mechanical gaming keyboard", "seller": {"username": "alice_seller", "email": "alice@example.com"}}
 
@@ -634,6 +636,7 @@ print(response.json())
 **Product Router** ([Product/routers/product.py](Product/routers/product.py))
 - Configured with `prefix="/product"` and `tags=['Product']` for clean URL structure and documentation grouping
 - All product CRUD operations (GET, POST, PUT, DELETE)
+- **Protected endpoints**: GET operations require JWT authentication via `get_current_user` dependency
 - Simplified route paths (e.g., `/{id}` instead of `/product/{id}`) due to prefix configuration
 - Uses `response_model=DisplayProduct` for GET endpoints to filter sensitive data
 - Returns 201 Created status code for POST operations
@@ -648,16 +651,19 @@ print(response.json())
 
 **Login Router** ([Product/routers/login.py](Product/routers/login.py))
 - Configured with `tags=['Login']` for documentation grouping
-- JWT-based authentication endpoint
+- OAuth2-compliant authentication endpoint using `OAuth2PasswordRequestForm`
 - Password verification using passlib with bcrypt
 - Token generation using python-jose library
+- Token validation with `get_current_user` dependency
+- OAuth2PasswordBearer scheme configured with `tokenUrl="login"`
 - Token configuration:
   - Algorithm: HS256 (configurable via environment variable)
   - Expiration: 20 minutes (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`)
   - Secret key: Loaded from environment variables for security
-- Authentication flow: username lookup → password verification → JWT token generation
+- Authentication flow: form data submission → username lookup → password verification → JWT token generation
 - Returns token in OAuth2 bearer token format
 - Proper error handling with 404 status codes for invalid credentials
+- `get_current_user` function validates JWT tokens and extracts user information for protected endpoints
 
 **Main Application** ([Product/main.py](Product/main.py))
 - FastAPI app initialization with metadata (title, description, contact info)
@@ -881,8 +887,11 @@ Future enhancements under consideration:
 - [x] Add HTTP status code 201 for POST endpoints
 - [x] Add seller login/authentication with JWT tokens
 - [x] Move SECRET_KEY to environment variables for security
+- [x] Implement OAuth2PasswordBearer authentication scheme
+- [x] Add JWT token validation with `get_current_user` dependency
+- [x] Protect product GET endpoints with JWT authentication
 - [ ] Use DisplaySeller response model to hide password hash from responses
-- [ ] Implement protected endpoints using JWT authentication
+- [ ] Protect remaining endpoints (POST, PUT, DELETE) with JWT authentication
 - [ ] Implement pagination for product listings
 - [ ] Add search and filtering capabilities
 - [ ] Include product categories/tags
@@ -912,6 +921,7 @@ Built with:
 - [Passlib](https://passlib.readthedocs.io/) - Password hashing library
 - [Bcrypt](https://github.com/pyca/bcrypt/) - Secure password hashing algorithm
 - [Python-JOSE](https://python-jose.readthedocs.io/) - JWT token creation and validation
+- [Python-Multipart](https://github.com/andrew-d/python-multipart) - Support for form data parsing (required for OAuth2PasswordRequestForm)
 
 ---
 
